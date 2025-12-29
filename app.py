@@ -39,8 +39,8 @@ st.markdown("""
 def load_data():
     base_dir = os.path.dirname(__file__)
     possible_paths = [
-        os.path.join(base_dir, "advertising.csv"),
-        os.path.join(base_dir, "data", "advertising.csv")
+        os.path.join(base_dir, "Advertising.csv"),
+        os.path.join(base_dir, "data", "Advertising.csv")
     ]
 
     for path in possible_paths:
@@ -58,7 +58,7 @@ if df is None:
     st.error("❌ advertising.csv not found in repository")
     st.info("📤 Please upload the advertising.csv file")
 
-    uploaded_file = st.file_uploader("Upload advertising.csv", type=["csv"])
+    uploaded_file = st.file_uploader("Upload Advertising.csv", type=["csv"])
     if uploaded_file is None:
         st.stop()
     df = pd.read_csv(uploaded_file)
@@ -168,3 +168,4 @@ ax3.set_ylabel("Predicted Sales")
 st.pyplot(fig3)
 
 st.success("✅ App executed successfully")
+
