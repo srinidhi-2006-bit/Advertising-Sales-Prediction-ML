@@ -33,15 +33,35 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# LOAD DATA (DEPLOYMENT SAFE)
+# LOAD DATA (BULLETPROOF)
 # --------------------------------------------------
 @st.cache_data
 def load_data():
     base_dir = os.path.dirname(__file__)
-    file_path = os.path.join(base_dir, "advertising.csv")
-    return pd.read_csv(file_path)
+    possible_paths = [
+        os.path.join(base_dir, "advertising.csv"),
+        os.path.join(base_dir, "data", "advertising.csv")
+    ]
+
+    for path in possible_paths:
+        if os.path.exists(path):
+            return pd.read_csv(path)
+
+    return None
 
 df = load_data()
+
+# --------------------------------------------------
+# FILE UPLOADER FALLBACK
+# --------------------------------------------------
+if df is None:
+    st.error("❌ advertising.csv not found in repository")
+    st.info("📤 Please upload the advertising.csv file")
+
+    uploaded_file = st.file_uploader("Upload advertising.csv", type=["csv"])
+    if uploaded_file is None:
+        st.stop()
+    df = pd.read_csv(uploaded_file)
 
 # --------------------------------------------------
 # SIDEBAR – REAL-TIME PREDICTION
@@ -49,26 +69,9 @@ df = load_data()
 st.sidebar.header("🚀 Real-time Prediction")
 st.sidebar.write("Adjust advertising budget:")
 
-tv = st.sidebar.slider(
-    "TV Budget",
-    float(df["TV"].min()),
-    float(df["TV"].max()),
-    float(df["TV"].mean())
-)
-
-radio = st.sidebar.slider(
-    "Radio Budget",
-    float(df["Radio"].min()),
-    float(df["Radio"].max()),
-    float(df["Radio"].mean())
-)
-
-news = st.sidebar.slider(
-    "Newspaper Budget",
-    float(df["Newspaper"].min()),
-    float(df["Newspaper"].max()),
-    float(df["Newspaper"].mean())
-)
+tv = st.sidebar.slider("TV Budget", float(df.TV.min()), float(df.TV.max()), float(df.TV.mean()))
+radio = st.sidebar.slider("Radio Budget", float(df.Radio.min()), float(df.Radio.max()), float(df.Radio.mean()))
+news = st.sidebar.slider("Newspaper Budget", float(df.Newspaper.min()), float(df.Newspaper.max()), float(df.Newspaper.mean()))
 
 # --------------------------------------------------
 # DATASET PREVIEW
@@ -77,39 +80,33 @@ st.subheader("Dataset Preview")
 st.dataframe(df.head(), use_container_width=True)
 
 # --------------------------------------------------
-# SIMPLE LINEAR REGRESSION (TV → Sales)
+# SIMPLE LINEAR REGRESSION
 # --------------------------------------------------
 X_slr = df[["TV"]]
 y = df["Sales"]
 
-Xtr_s, Xte_s, ytr_s, yte_s = train_test_split(
-    X_slr, y, test_size=0.2, random_state=42
-)
+Xtr_s, Xte_s, ytr_s, yte_s = train_test_split(X_slr, y, test_size=0.2, random_state=42)
 
 sc_slr = StandardScaler()
 Xtr_s_scaled = sc_slr.fit_transform(Xtr_s)
 Xte_s_scaled = sc_slr.transform(Xte_s)
 
-slr_model = LinearRegression()
-slr_model.fit(Xtr_s_scaled, ytr_s)
+slr_model = LinearRegression().fit(Xtr_s_scaled, ytr_s)
 y_pred_s = slr_model.predict(Xte_s_scaled)
 
 # --------------------------------------------------
-# MULTIPLE LINEAR REGRESSION (TV + Radio + Newspaper)
+# MULTIPLE LINEAR REGRESSION
 # --------------------------------------------------
 features = ["TV", "Radio", "Newspaper"]
 X_mlr = df[features]
 
-Xtr_m, Xte_m, ytr_m, yte_m = train_test_split(
-    X_mlr, y, test_size=0.2, random_state=42
-)
+Xtr_m, Xte_m, ytr_m, yte_m = train_test_split(X_mlr, y, test_size=0.2, random_state=42)
 
 sc_mlr = StandardScaler()
 Xtr_m_scaled = sc_mlr.fit_transform(Xtr_m)
 Xte_m_scaled = sc_mlr.transform(Xte_m)
 
-mlr_model = LinearRegression()
-mlr_model.fit(Xtr_m_scaled, ytr_m)
+mlr_model = LinearRegression().fit(Xtr_m_scaled, ytr_m)
 y_pred_m = mlr_model.predict(Xte_m_scaled)
 
 # --------------------------------------------------
@@ -137,25 +134,17 @@ with col1:
     m3.metric("R²", f"{r2_score(yte_s, y_pred_s):.2f}")
 
     fig1, ax1 = plt.subplots()
-    ax1.scatter(df["TV"], df["Sales"], alpha=0.4)
+    ax1.scatter(df.TV, df.Sales, alpha=0.4)
 
-    x_line = pd.DataFrame(
-        np.linspace(df["TV"].min(), df["TV"].max(), 100),
-        columns=["TV"]
-    )
-    ax1.plot(
-        x_line,
-        slr_model.predict(sc_slr.transform(x_line)),
-        color="red",
-        linewidth=3
-    )
+    x_line = pd.DataFrame(np.linspace(df.TV.min(), df.TV.max(), 100), columns=["TV"])
+    ax1.plot(x_line, slr_model.predict(sc_slr.transform(x_line)), color="red", linewidth=3)
 
     ax1.set_xlabel("TV Budget")
     ax1.set_ylabel("Sales")
     st.pyplot(fig1)
 
 with col2:
-    st.markdown("### 📉 MLR: Feature Correlation")
+    st.markdown("### 📉 Feature Correlation")
 
     m1, m2, m3 = st.columns(3)
     m1.metric("MAE", f"{mean_absolute_error(yte_m, y_pred_m):.2f}")
@@ -173,11 +162,7 @@ st.markdown("### 🎯 Actual vs Predicted Sales (MLR)")
 
 fig3, ax3 = plt.subplots()
 ax3.scatter(yte_m, y_pred_m, alpha=0.6)
-ax3.plot(
-    [yte_m.min(), yte_m.max()],
-    [yte_m.min(), yte_m.max()],
-    linestyle="--"
-)
+ax3.plot([yte_m.min(), yte_m.max()], [yte_m.min(), yte_m.max()], linestyle="--")
 ax3.set_xlabel("Actual Sales")
 ax3.set_ylabel("Predicted Sales")
 st.pyplot(fig3)
